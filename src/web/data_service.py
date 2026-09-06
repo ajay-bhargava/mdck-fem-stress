@@ -277,7 +277,7 @@ class DataService:
             "width_px": int(shape[2]),
         }
 
-    def source_image_jpeg(self, position: str, frame: int, layer: str) -> bytes:
+    def source_image_jpeg(self, position: str, frame: int, layer: str, max_width: int = 1280) -> bytes:
         info = self.source_image_info(position, layer)
         self._validate_frame(position, frame, info["frame_count"])
         directory = self.position_dir(position)
@@ -285,7 +285,7 @@ class DataService:
         path = Path(source_paths[layer])
         if not path.is_absolute():
             path = self.data_root.parent / path
-        return _render_grayscale_jpeg(str(path.resolve()), frame)
+        return _render_grayscale_jpeg(str(path.resolve()), frame, max_width=max_width)
 
     @lru_cache(maxsize=24)
     def nuclear_overlay_png(self, position: str, frame: int) -> bytes:

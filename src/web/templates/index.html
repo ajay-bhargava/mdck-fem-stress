@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>How a living cell sheet pushes</title>
   <style>
     #film { position:absolute; inset:0; pointer-events:none; }
@@ -18,10 +18,22 @@
     html::-webkit-scrollbar { display:none; }
     body { margin:0; font-family:Arial,Helvetica,sans-serif; color:var(--ink); background:#08090b; height:1600vh; }
     main { position:fixed; inset:0; min-height:0; background:#08090b; }
+    .intro { position:relative; z-index:10; min-height:100svh; display:grid; align-content:center; padding:clamp(48px,9vh,110px) max(24px,calc((100vw - 760px)/2)); background:#08090b; }
+    .intro .eyebrow { color:var(--accent); font:700 11px/1.4 Arial,sans-serif; letter-spacing:.16em; text-transform:uppercase; }
+    .intro h1 { margin:20px 0 24px; max-width:760px; font:400 clamp(42px,7vw,78px)/1.03 Georgia,serif; letter-spacing:-.035em; }
+    .intro .dek { max-width:620px; margin:0 0 24px; font:22px/1.5 Georgia,serif; color:#ddd9d3; }
+    .intro p { max-width:620px; margin:0 0 18px; font:17px/1.65 Georgia,serif; color:#adb0b8; }
+    .intro strong { color:#eeeae4; font-weight:400; }
+    .intro .instruction { margin-top:18px; border-top:1px solid var(--line); padding-top:22px; font:14px/1.6 Arial,sans-serif; }
+    .begin-link { width:fit-content; margin-top:16px; padding:12px 0; color:var(--accent); font:700 12px/1.5 Arial,sans-serif; letter-spacing:.12em; text-transform:uppercase; text-decoration:none; }
+    .begin-link span { display:inline-block; margin-left:10px; font-size:20px; }
+    .begin-link:focus-visible { outline:2px solid var(--accent); outline-offset:6px; }
+    main[data-intro="true"] .story-card,main[data-intro="true"] .controls { visibility:hidden; }
+    @media(max-width:650px) { .intro .dek { font-size:20px; } .intro p { font-size:16px; } }
     .visual { position:relative; width:100%; height:100%; }
     .story-card { position:absolute; z-index:5; left:4vw; top:9vh; width:min(360px,calc(100% - 32px)); padding:18px 20px; background:rgba(17,19,23,.87); border-top:2px solid var(--accent); backdrop-filter:blur(12px); pointer-events:none; transition:left .6s ease,top .6s ease,transform .6s ease; }
     .story-card .kicker { color:var(--accent); font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
-    .story-card h1 { margin:5px 0 7px; font:700 clamp(21px,2.2vw,31px)/1.08 Georgia,serif; }
+    .story-card h2 { margin:5px 0 7px; font:700 clamp(21px,2.2vw,31px)/1.08 Georgia,serif; }
     .story-card p { margin:0; font:15px/1.42 Georgia,serif; color:#c6c8cd; }
     .story-card .metric { margin-top:10px; font:400 12px/1.4 Arial,sans-serif; color:#a4a8b2; }
     .story-card[data-view="fem_story"] { left:96vw; top:12vh; transform:translateX(-100%); }
@@ -35,18 +47,29 @@
     #status { position:fixed; bottom:90px; width:100%; color:#efab95; font-size:12px; text-align:center; }
     @media(max-width:650px) {
       .story-card { width:min(290px,88vw); padding:12px 15px; }
-      .story-card h1 { font-size:23px; }
+      .story-card h2 { font-size:23px; }
       .story-card p { font-size:14px; }
       .story-card[data-view="fem_nodal_forces"],.story-card[data-view="force_balance_story"] { top:72vh; }
     }
     @media(prefers-reduced-motion:reduce) { .story-card { transition:none; } }
   </style>
+  <link rel="stylesheet" href="assets/viewer.css?v=mobile-v1">
 </head>
 <body>
-<main>
+<header class="intro" id="introduction" aria-labelledby="intro-title">
+  <div class="eyebrow">Living materials · An interactive explainer</div>
+  <h1 id="intro-title">How does a sheet<br>of cells carry force?</h1>
+  <p class="dek">A layer of cells is more than a collection of living parts. Together, they form a material that moves, pulls, and carries stress.</p>
+  <p>Here, <strong>MDCK cells</strong>, a laboratory model of kidney epithelial tissue, grow on a soft gel. Their pulls deform the gel. Traction-force microscopy uses that deformation to estimate the forces beneath the sheet.</p>
+  <p>Images alone cannot tell us how those forces are carried inside the tissue. A <strong>finite element model</strong> combines the measured loads with explicit mechanical assumptions to predict stress. Comparing stress with cell motion can eventually help us test how living sheets behave as materials.</p>
+  <p class="instruction"><strong>You control the pace.</strong> Scroll to follow 24 hours of cell motion, then continue through nuclear outlines, the mesh, forces, and predicted stress. Each new layer revisits the same time span. Scroll back to retrace it.</p>
+  <a class="begin-link" href="#film-start">Scroll to begin <span aria-hidden="true">↓</span></a>
+</header>
+<div id="film-start" aria-hidden="true"></div>
+<main class="overflow-hidden" data-intro="true" inert aria-hidden="true">
   <div class="visual">
     <div id="film" hidden aria-label="Educational time-lapse"><img id="filmImage" alt="Observed nuclei"><img id="filmLabels" alt="" hidden></div>
-    <aside class="story-card" aria-live="polite"><div class="kicker" id="storyKicker">Observed</div><h1 id="storyTitle">A living sheet of cells</h1><p id="storyBody">Nuclei act as landmarks as the monolayer changes over time.</p><div class="metric" id="storyMetric"></div><div id="stressScale" class="stress-scale" hidden>Maximum absolute principal stress<div class="bar"></div><span id="stressScaleText"></span></div></aside>
+    <aside class="story-card" aria-live="polite"><div class="kicker" id="storyKicker">Observed</div><h2 id="storyTitle">A living sheet of cells</h2><p id="storyBody">Nuclei act as landmarks as the monolayer changes over time.</p><div class="metric" id="storyMetric"></div><div id="stressScale" class="stress-scale" hidden>Maximum absolute principal stress<div class="bar"></div><span id="stressScaleText"></span></div></aside>
   </div>
   <section class="controls" aria-label="Time-lapse controls">
     <div class="select-row">
@@ -104,15 +127,15 @@ function setStory(kicker,title,body,metric){
   document.getElementById('storyBody').textContent=body;
   document.getElementById('storyMetric').textContent=metric||'';
 }
-function nucleiUrl(frame){return join(state.filmRoot,`nuclei/frame${pad(frame)}.jpg`);}
-function overlayUrl(chapter,frame){
+function chapterUrl(chapter,frame){
   const h=Number(thicknessEl.value);
-  if(chapter==='nuclear_segmentation')return join(state.filmRoot,`nuclear_segmentation/frame${pad(frame)}.png`);
-  if(chapter==='fem_story')return join(state.filmRoot,'mesh.png');
-  if(chapter==='fem_nodal_forces')return join(state.filmRoot,`nodal_forces/frame${pad(frame)}.png`);
-  if(chapter==='force_balance_story')return join(state.filmRoot,`force_balance/frame${pad(frame)}.png`);
-  if(chapter==='predicted_stress')return join(state.filmRoot,`stress/${h}um/frame${pad(frame)}.png`);
-  return '';
+  if(chapter==='nuclei')return join(state.filmRoot,`nuclei/frame${pad(frame)}.webp`);
+  if(chapter==='nuclear_segmentation')return join(state.filmRoot,`nuclear_segmentation/frame${pad(frame)}.webp`);
+  if(chapter==='fem_story')return join(state.filmRoot,`fem_story/frame${pad(frame)}.webp`);
+  if(chapter==='fem_nodal_forces')return join(state.filmRoot,`nodal_forces/frame${pad(frame)}.webp`);
+  if(chapter==='force_balance_story')return join(state.filmRoot,`force_balance/frame${pad(frame)}.webp`);
+  if(chapter==='predicted_stress')return join(state.filmRoot,`stress/${h}um/frame${pad(frame)}.webp`);
+  return join(state.filmRoot,`nuclei/frame${pad(frame)}.webp`);
 }
 function updateFrameLabel(){
   const hours=Number(state.manifest?.hours_per_frame||0.25)*Number(frameEl.value);
@@ -135,7 +158,7 @@ function applyManifest(manifest,filmRoot,positions){
   const colorMax=Number(manifest.thickness_comparison_color_max_pa);
   if(!Number.isFinite(colorMax)||colorMax<=0)throw new Error('Stress color-scale metadata is unavailable.');
   document.getElementById('stressScaleText').textContent=`0 — ${colorMax.toFixed(0)} Pa · same scale for all times and thicknesses; larger values saturated`;
-  document.body.style.height=`${(1+manifest.chapters.length*2.5)*100}vh`;
+  sizeScrollStory();
 }
 async function loadConfig(){
   const local=await fetch('manifest.json',{cache:'no-store'});
@@ -159,17 +182,13 @@ async function renderCurrent(){
   const frame=Number(frameEl.value);
   const thickness=Number(thicknessEl.value);
   document.getElementById('thicknessControl').hidden=chapter!=='predicted_stress';
-  const base=nucleiUrl(frame);
-  const overlay=overlayUrl(chapter,frame);
-  await Promise.all([readyImage(base),...(overlay?[readyImage(overlay)]:[])]);
+  const url=chapterUrl(chapter,frame);
+  await readyImage(url);
   if(token!==state.token)return;
   if(chapter!==layerEl.value||frame!==Number(frameEl.value)||thickness!==Number(thicknessEl.value))return;
-  filmImage.src=base;
-  filmLabels.hidden=!overlay;
-  if(overlay){
-    filmLabels.src=overlay;
-    filmLabels.alt=chapter==='nuclear_segmentation'?'Nuclear segmentation boundaries':chapter==='predicted_stress'?`Conditional FEM stress magnitude, frame ${frame}`:'';
-  }
+  filmImage.src=url;
+  filmImage.alt=chapter==='nuclear_segmentation'?'Nuclear segmentation on nuclei':chapter==='predicted_stress'?`Conditional FEM stress magnitude, frame ${frame}`:'Educational time-lapse frame';
+  filmLabels.hidden=true;
   filmEl.hidden=false;
   if(chapter==='predicted_stress'){
     const h=Number(thicknessEl.value);
@@ -187,11 +206,7 @@ async function renderCurrent(){
   }
   for(let step=1;step<=3;step++){
     const next=frame+step;
-    if(next<=frameEl.max){
-      readyImage(nucleiUrl(next)).catch(()=>{});
-      const nextOverlay=overlayUrl(chapter,next);
-      if(nextOverlay)readyImage(nextOverlay).catch(()=>{});
-    }
+    if(next<=frameEl.max)readyImage(chapterUrl(chapter,next)).catch(()=>{});
   }
 }
 let renderBusy=false,renderPending=false;
@@ -202,9 +217,18 @@ async function render(){
   try{while(renderPending){renderPending=false;await renderCurrent();}}
   finally{renderBusy=false;}
 }
+function introHeight(){return document.getElementById('introduction').offsetHeight;}
+function sizeScrollStory(){
+  if(state.manifest)document.body.style.height=`${introHeight()+innerHeight*(1+state.manifest.chapters.length*2.5)}px`;
+}
+function updateIntro(){
+  const active=scrollY+1<introHeight(),main=document.querySelector('main');
+  main.dataset.intro=String(active);main.inert=active;main.setAttribute('aria-hidden',String(active));
+}
 function scrubTime(){
+  updateIntro();
   const count=layerEl.options.length;if(!count||!state.manifest)return;
-  const progress=Math.max(0,Math.min(count,scrollY/Math.max(1,innerHeight*2.5)));
+  const progress=Math.max(0,Math.min(count,(scrollY-introHeight())/Math.max(1,innerHeight*2.5)));
   const chapter=Math.min(count-1,Math.floor(progress));
   const next=Math.min(Number(frameEl.max),Math.round((progress-chapter)*Number(frameEl.max)));
   if(next===Number(frameEl.value)&&chapter===layerEl.selectedIndex)return;
@@ -213,15 +237,16 @@ function scrubTime(){
 }
 let scrollTick=0;
 window.addEventListener('scroll',()=>{if(scrollTick)return;scrollTick=requestAnimationFrame(()=>{scrollTick=0;scrubTime();});},{passive:true});
-window.addEventListener('resize',scrubTime);
+window.addEventListener('resize',()=>{sizeScrollStory();scrubTime();});
 layerEl.addEventListener('change',()=>{
-  window.scrollTo(0,layerEl.selectedIndex*innerHeight*2.5);
+  window.scrollTo(0,introHeight()+layerEl.selectedIndex*innerHeight*2.5);
   frameEl.value=0;updateFrameLabel();render();
 });
 thicknessEl.addEventListener('change',render);
 positionEl.addEventListener('change',()=>statusEl.textContent='Only pos01 is available in this film.');
 loadConfig().then(()=>{
-  frameEl.value=0;window.scrollTo(0,0);updateFrameLabel();
+  frameEl.value=0;updateFrameLabel();
+  sizeScrollStory();scrubTime();
   return render();
 }).catch(error=>{statusEl.textContent=error.message;});
 </script>

@@ -1,0 +1,12 @@
+{
+  "name": "mdck-mechanics-viewer",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i src/web/styles/viewer.css -o src/web/static/viewer.css --minify",
+    "build:site": "bun run build:css && uv run python -m scripts.build_film_display"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}

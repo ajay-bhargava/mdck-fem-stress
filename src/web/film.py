@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from io import BytesIO
 from PIL import Image, ImageDraw
 from skimage.segmentation import find_boundaries
 from skimage.transform import resize
@@ -19,7 +20,9 @@ from skimage.transform import resize
 from src.web.data_service import DataService
 
 FILM_VERSION = "v1"
-DISPLAY_WIDTH = 1280
+DISPLAY_WIDTH = 960
+JPEG_QUALITY = 84
+WEBP_QUALITY = 80
 CHAPTERS = [
     "nuclei",
     "nuclear_segmentation",
@@ -53,11 +56,33 @@ def _canvas(width: int, height: int) -> Image.Image:
 
 
 def _png(image: Image.Image) -> bytes:
-    from io import BytesIO
-
     output = BytesIO()
     image.save(output, format="PNG", optimize=True)
     return output.getvalue()
+
+
+def _jpeg(image: Image.Image, quality: int = JPEG_QUALITY) -> bytes:
+    output = BytesIO()
+    image.convert("RGB").save(output, format="JPEG", quality=quality, optimize=True)
+    return output.getvalue()
+
+
+def _webp(image: Image.Image, quality: int = WEBP_QUALITY) -> bytes:
+    output = BytesIO()
+    image.convert("RGB").save(output, format="WEBP", quality=quality, method=6)
+    return output.getvalue()
+
+
+def _open_image(content: bytes) -> Image.Image:
+    return Image.open(BytesIO(content))
+
+
+def _composite_rgb(base: Image.Image, overlay: Image.Image) -> Image.Image:
+    rgb = base.convert("RGBA")
+    overlay = overlay.convert("RGBA")
+    if overlay.size != rgb.size:
+        overlay = overlay.resize(rgb.size, Image.Resampling.BILINEAR)
+    return Image.alpha_composite(rgb, overlay).convert("RGB")
 
 
 def _draw_boundary(draw: ImageDraw.ImageDraw, boundary: dict[str, Any], scale: float, color: tuple[int, int, int, int], width: int) -> None:
@@ -122,7 +147,7 @@ def _mix_color(fraction: float) -> tuple[int, int, int, int]:
     return (*stops[-1][1], 230)
 
 
-def render_nuclear_overlay(service: DataService, position: str, frame: int) -> bytes:
+def render_nuclear_overlay(service: DataService, position: str, frame: int) -> Image.Image:
     import tifffile
 
     width, height, _scale = _display_geometry(service, position)
@@ -137,14 +162,10 @@ def render_nuclear_overlay(service: DataService, position: str, frame: int) -> b
     edges = find_boundaries(small, mode="thick")
     rgba = np.zeros((height, width, 4), dtype=np.uint8)
     rgba[edges] = (97, 230, 206, 235)
-    from io import BytesIO
-
-    output = BytesIO()
-    Image.fromarray(rgba, mode="RGBA").save(output, format="PNG", optimize=True)
-    return output.getvalue()
+    return Image.fromarray(rgba, mode="RGBA")
 
 
-def render_mesh_overlay(service: DataService, position: str) -> bytes:
+def render_mesh_overlay(service: DataService, position: str) -> Image.Image:
     width, height, scale = _display_geometry(service, position)
     mesh = service.mesh(position, max_elements=14_000)
     boundary = service.mesh_boundary(position)
@@ -156,10 +177,10 @@ def render_mesh_overlay(service: DataService, position: str) -> bytes:
         points.append(points[0])
         draw.line(points, fill=(255, 255, 255, 122), width=1)
     _draw_boundary(draw, boundary, scale, (245, 158, 11, 230), 3)
-    return _png(image)
+    return image
 
 
-def render_nodal_overlay(service: DataService, position: str, frame: int) -> bytes:
+def render_nodal_overlay(service: DataService, position: str, frame: int) -> Image.Image:
     width, height, scale = _display_geometry(service, position)
     payload = service.load_nodes(position, frame, max_nodes=1_400)
     boundary = service.mesh_boundary(position)
@@ -173,10 +194,10 @@ def render_nodal_overlay(service: DataService, position: str, frame: int) -> byt
         x, y = float(point[0]) * scale, float(point[1]) * scale
         draw.ellipse((x - 1.5, y - 1.5, x + 1.5, y + 1.5), fill=(239, 68, 68, 90))
     _draw_arrows(draw, xy, dx, dy, scale, (239, 68, 68, 230), target_length=60)
-    return _png(image)
+    return image
 
 
-def render_balance_overlay(service: DataService, position: str, frame: int) -> bytes:
+def render_balance_overlay(service: DataService, position: str, frame: int) -> Image.Image:
     width, height, scale = _display_geometry(service, position)
     payload = service.load_balance_map(position, frame, bins=10)
     boundary = service.mesh_boundary(position)
@@ -197,7 +218,7 @@ def render_balance_overlay(service: DataService, position: str, frame: int) -> b
             width=1,
         )
     _draw_arrows(draw, centers, dx, dy, scale, (248, 250, 252, 230), target_length=90)
-    return _png(image)
+    return image
 
 
 def _link_or_copy(source: Path, destination: Path) -> None:
@@ -242,13 +263,15 @@ def build_manifest(service: DataService, position: str, frame_count: int) -> dic
             "0 saturates above the shared maximum absolute principal stress "
             f"({color_max:.6f} Pa) for every frame and thickness; triangles are not smoothed."
         ),
+        "composite": "single 960px WebP per chapter and frame; overlays burned in at bake time",
+        "display_width_px": DISPLAY_WIDTH,
         "urls": {
-            "nuclei": "nuclei/frame{frame:03d}.jpg",
-            "nuclear_segmentation": "nuclear_segmentation/frame{frame:03d}.png",
-            "fem_story": "mesh.png",
-            "fem_nodal_forces": "nodal_forces/frame{frame:03d}.png",
-            "force_balance_story": "force_balance/frame{frame:03d}.png",
-            "predicted_stress": "stress/{thickness_um:g}um/frame{frame:03d}.png",
+            "nuclei": "nuclei/frame{frame:03d}.webp",
+            "nuclear_segmentation": "nuclear_segmentation/frame{frame:03d}.webp",
+            "fem_story": "fem_story/frame{frame:03d}.webp",
+            "fem_nodal_forces": "nodal_forces/frame{frame:03d}.webp",
+            "force_balance_story": "force_balance/frame{frame:03d}.webp",
+            "predicted_stress": "stress/{thickness_um:g}um/frame{frame:03d}.webp",
         },
         "caveats": [
             "Label_Image / labels.tif are StarDist nuclear masks, not cell boundaries.",
@@ -264,6 +287,26 @@ def build_manifest(service: DataService, position: str, frame_count: int) -> dic
     }
 
 
+def _overlay_from_disk_or_render(path: Path, renderer) -> Image.Image:
+    if path.is_file():
+        return Image.open(path).convert("RGBA")
+    overlay = renderer()
+    if not isinstance(overlay, Image.Image):
+        overlay = _open_image(overlay)
+    return overlay.convert("RGBA")
+
+
+def _write_composited(path: Path, base: Image.Image, overlay: Image.Image) -> None:
+    _atomic_write(path, _webp(_composite_rgb(base, overlay)))
+
+
+def _remove_globs(folder: Path, pattern: str) -> None:
+    if not folder.exists():
+        return
+    for path in folder.rglob(pattern):
+        path.unlink()
+
+
 def build_position(service: DataService, position: str) -> Path:
     root = film_root(service, position)
     root.mkdir(parents=True, exist_ok=True)
@@ -271,44 +314,62 @@ def build_position(service: DataService, position: str) -> Path:
     frame_count = int(info["frame_count"])
     nuclei_dir = root / "nuclei"
     overlay_dir = root / "nuclear_segmentation"
+    mesh_dir = root / "fem_story"
     nodal_dir = root / "nodal_forces"
     balance_dir = root / "force_balance"
-    for folder in (nuclei_dir, overlay_dir, nodal_dir, balance_dir):
+    for folder in (nuclei_dir, overlay_dir, mesh_dir, nodal_dir, balance_dir):
         folder.mkdir(exist_ok=True)
 
-    mesh_path = root / "mesh.png"
-    if not mesh_path.is_file():
-        _atomic_write(mesh_path, render_mesh_overlay(service, position))
-        print(f"{position}: mesh overlay ready", flush=True)
-
-    for frame in range(frame_count):
-        jpeg_path = nuclei_dir / f"frame{frame:03d}.jpg"
-        if not jpeg_path.is_file():
-            _atomic_write(jpeg_path, service.source_image_jpeg(position, frame, "nuclei"))
-        overlay_path = overlay_dir / f"frame{frame:03d}.png"
-        if not overlay_path.is_file():
-            _atomic_write(overlay_path, render_nuclear_overlay(service, position, frame))
-        nodal_path = nodal_dir / f"frame{frame:03d}.png"
-        if not nodal_path.is_file():
-            _atomic_write(nodal_path, render_nodal_overlay(service, position, frame))
-        balance_path = balance_dir / f"frame{frame:03d}.png"
-        if not balance_path.is_file():
-            _atomic_write(balance_path, render_balance_overlay(service, position, frame))
-        if frame % 10 == 0 or frame == frame_count - 1:
-            print(f"{position}: frames 0-{frame} / {frame_count - 1}", flush=True)
+    mesh_overlay = render_mesh_overlay(service, position)
+    print(f"{position}: compositing 960px WebP frames", flush=True)
 
     summary = service.stress_series_summary(position)
     stress_src = service.position_dir(position) / "fem/stress/time_series/display_thickness_v1"
     for thickness in summary["thickness_options_um"]:
-        source_dir = stress_src / f"{thickness:g}um"
-        dest_dir = root / "stress" / f"{thickness:g}um"
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        for frame in range(frame_count):
-            source = source_dir / f"frame{frame:03d}.png"
+        (root / "stress" / f"{thickness:g}um").mkdir(parents=True, exist_ok=True)
+
+    for frame in range(frame_count):
+        nuclei_path = nuclei_dir / f"frame{frame:03d}.webp"
+        if nuclei_path.is_file():
+            base = Image.open(nuclei_path).convert("RGB")
+        else:
+            content = service.source_image_jpeg(position, frame, "nuclei", max_width=DISPLAY_WIDTH)
+            base = _open_image(content).convert("RGB")
+            _atomic_write(nuclei_path, _webp(base))
+
+        seg_path = overlay_dir / f"frame{frame:03d}.webp"
+        if not seg_path.is_file():
+            _write_composited(seg_path, base, render_nuclear_overlay(service, position, frame))
+
+        mesh_path = mesh_dir / f"frame{frame:03d}.webp"
+        if not mesh_path.is_file():
+            _write_composited(mesh_path, base, mesh_overlay)
+
+        nodal_path = nodal_dir / f"frame{frame:03d}.webp"
+        if not nodal_path.is_file():
+            _write_composited(nodal_path, base, render_nodal_overlay(service, position, frame))
+
+        balance_path = balance_dir / f"frame{frame:03d}.webp"
+        if not balance_path.is_file():
+            _write_composited(balance_path, base, render_balance_overlay(service, position, frame))
+
+        for thickness in summary["thickness_options_um"]:
+            dest = root / "stress" / f"{thickness:g}um" / f"frame{frame:03d}.webp"
+            if dest.is_file():
+                continue
+            source = stress_src / f"{thickness:g}um" / f"frame{frame:03d}.png"
             if not source.is_file():
                 raise FileNotFoundError(f"missing precomputed stress PNG: {source}")
-            _link_or_copy(source, dest_dir / f"frame{frame:03d}.png")
+            _write_composited(dest, base, Image.open(source).convert("RGBA"))
+
+        if frame % 10 == 0 or frame == frame_count - 1:
+            print(f"{position}: frames 0-{frame} / {frame_count - 1}", flush=True)
+
     shutil.copy2(stress_src / "provenance.json", root / "stress" / "provenance.json")
+    for folder in (root,):
+        _remove_globs(folder, "*.png")
+        _remove_globs(folder, "*.jpg")
+        _remove_globs(folder, "*.jpeg")
 
     manifest = build_manifest(service, position, frame_count)
     (root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
@@ -320,8 +381,20 @@ def export_site(service: DataService, position: str, site_root: Path, index_html
     source = film_root(service, position)
     if not (source / "manifest.json").is_file():
         raise FileNotFoundError("film bake is missing; run build_film_display first")
+    stylesheet = index_html.parent.parent / "static/viewer.css"
+    if not stylesheet.is_file():
+        raise FileNotFoundError("Compiled stylesheet missing; run bun run build:css first")
     site_root.mkdir(parents=True, exist_ok=True)
     shutil.copy2(index_html, site_root / "index.html")
+    (site_root / "assets").mkdir(exist_ok=True)
+    shutil.copy2(stylesheet, site_root / "assets/viewer.css")
+    keep = {item.name for item in source.iterdir()} | {"index.html", "assets"}
+    for extra in list(site_root.iterdir()):
+        if extra.name not in keep:
+            if extra.is_dir():
+                shutil.rmtree(extra)
+            else:
+                extra.unlink()
     for item in source.iterdir():
         destination = site_root / item.name
         if item.is_dir():

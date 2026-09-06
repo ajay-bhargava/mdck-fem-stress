@@ -79,6 +79,7 @@ def film_asset(position: str, asset_path: str) -> FileResponse:
     media_types = {
         ".jpg": "image/jpeg",
         ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
         ".png": "image/png",
         ".json": "application/json",
     }
@@ -102,6 +103,14 @@ def health() -> dict[str, object]:
         in {"1", "true", "yes"},
         "plotly_version": plotly.__version__,
     }
+
+
+@app.get("/assets/viewer.css", include_in_schema=False)
+def viewer_stylesheet() -> FileResponse:
+    path = PROJECT_ROOT / "src/web/static/viewer.css"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Run bun run build:css first")
+    return FileResponse(path, media_type="text/css")
 
 
 @app.get("/assets/plotly.min.js", include_in_schema=False)

@@ -66,7 +66,7 @@ Synthetic tests check uniform stress recovery, rigid rotation, disconnected comp
 
 The goal is a lightweight Cloudflare-compatible site that serves prepared images and small metadata files. Scientific computation belongs in an offline build, not in a visitor's browser or a request handler.
 
-Stress images are already pre-rendered for all frames and thicknesses. Conversion of the rest of the experience to static assets is ongoing. The current local viewer still uses a Python backend.
+All chapters use pre-rendered WebP frames. The public site serves static assets through Cloudflare Workers, with no Python computation per request. Tailwind CSS is compiled offline, with no browser-side Tailwind runtime. On mobile, information cards fill the width and centered images crop at the viewport edges.
 
 Keep image dimensions and color scales consistent, preload nearby frames, and publish only the assets the lesson needs. Raw microscopy and full solver arrays do not belong in the website bundle.
 
@@ -75,11 +75,19 @@ Keep image dimensions and color scales consistent, preload nearby frames, and pu
 <details>
 <summary>💻 Local development</summary>
 
-Requires Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.12 or newer, [uv](https://docs.astral.sh/uv/), and [Bun](https://bun.sh/).
 
 ```sh
 uv sync
+bun install --frozen-lockfile
+bun run build:css
 ./scripts/run_web.sh
+```
+
+To bake and export the static site from prepared local data:
+
+```sh
+bun run build:site
 ```
 
 The local viewer requires separately prepared data. This repository intentionally excludes experimental inputs, solver results, generated media, and credentials. A fresh clone is not a standalone dataset or a finished static deployment.

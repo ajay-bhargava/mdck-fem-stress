@@ -1,0 +1,65 @@
+/* Compiled offline. No Tailwind runtime or external CDN on the public page. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@source "../templates/index.html";
+
+html, body { overflow-x: clip; }
+
+@media (width < 48rem) {
+  .intro {
+    @apply px-6;
+    padding-top: max(3rem, env(safe-area-inset-top));
+    padding-bottom: 3rem;
+  }
+  .intro h1 { font-size: clamp(2.5rem, 9vw, 4rem); }
+  .intro .dek { font-size: 1.25rem; }
+  .intro p { font-size: 1rem; }
+
+  /* Same centered crop for every chapter and thickness. Only the viewport
+     changes, never the physical geometry or field coordinates. */
+  #film {
+    top: 22svh;
+    bottom: calc(100px + env(safe-area-inset-bottom));
+    overflow: hidden;
+  }
+  #film img {
+    object-fit: cover;
+    object-position: center;
+  }
+  .story-card,
+  .story-card[data-view] {
+    @apply left-0 right-0 top-0 w-full max-w-none transform-none rounded-none;
+    padding: calc(16px + env(safe-area-inset-top)) 20px 16px;
+    max-height: 34svh;
+    overflow-y: auto;
+    pointer-events: auto;
+    background: rgba(17,19,23,.96);
+    backdrop-filter: none;
+    transition: none;
+  }
+  .story-card h2 { font-size: 1.5rem; line-height: 1.12; }
+  .story-card p { font-size: .9375rem; line-height: 1.4; }
+  .story-card .metric { font-size: .75rem; margin-top: 8px; }
+  .stress-scale { margin-top: 8px; }
+  .controls {
+    @apply left-0 right-0 w-full transform-none;
+    bottom: 0;
+    padding: 16px 16px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, #08090b 25%);
+  }
+  .select-row { @apply flex flex-wrap justify-center gap-2; }
+  .select-row > div { min-width: 0; flex: 1 1 130px; }
+  select {
+    @apply w-full max-w-full;
+    min-height: 44px;
+    font-size: 16px;
+    padding: 8px 10px;
+  }
+  .scroll-hint { font-size: 11px; white-space: normal; }
+  #status { left: 16px; width: calc(100% - 32px); bottom: 110px; }
+}
+
+@media (width < 48rem) and (height < 32rem) {
+  .story-card, .story-card[data-view] { max-height: 38svh; }
+  #film { top: 10svh; bottom: 80px; }
+}

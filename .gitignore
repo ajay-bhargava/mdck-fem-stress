@@ -56,6 +56,7 @@ wheels/
 
 # Frontend and Cloudflare local/generated output
 /site/
+/src/web/static/viewer.css
 node_modules/
 .wrangler/
 .dev.vars
