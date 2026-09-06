@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ report.position }} alignment diagnostics</title>
+  <style>
+    body{font:14px Arial,sans-serif;color:#17212b;max-width:1080px;margin:24px auto;padding:0 20px;line-height:1.45}h1{font-size:23px}h2{font-size:17px;margin-top:28px;border-bottom:1px solid #c9d1d9;padding-bottom:5px}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:7px 9px;border:1px solid #d8dee4}th{background:#f6f8fa;width:34%}code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}pre{background:#f6f8fa;padding:12px;overflow:auto;font-size:12px}.ok{color:#166534;font-weight:700}.warning{color:#92400e}a{color:#075985}
+    :root{color-scheme:dark}body{background:#08090b;color:#eeeae4}h2,th,td{border-color:#383b42}th,pre{background:#17191e}.ok{color:#86d7a3}.warning{color:#eead7f}a{color:#94bce8}
+  </style>
+</head>
+<body>
+{% set a=report.alignment %}{% set m=report.metadata %}{% set c=report.coordinate_transform %}{% set g=a.grid_mapping %}{% set d=a.displacement_agreement %}
+<p><a href="/">← Dataset explorer</a></p>
+<h1>{{ report.position }} — source and alignment diagnostics</h1>
+<p>Status: <span class="ok">{{ a.status }}</span>. This report describes persistent Stage 1–2 artifacts; it contains no FEM result.</p>
+<h2>Physical and acquisition metadata</h2>
+<table>
+<tr><th>Frames / interval</th><td>{{ m.imaging.n_frames }} / {{ m.imaging.frame_interval_min }} min</td></tr>
+<tr><th>Pixel size</th><td>{{ m.imaging.pixel_size_um }} µm ({{ m.imaging.pixel_size_m }} m)</td></tr>
+<tr><th>Substrate E / ν / thickness</th><td>{{ m.substrate.young_modulus_pa }} Pa / {{ m.substrate.poisson_ratio }} / {{ m.substrate.thickness_um }} µm</td></tr>
+<tr><th>Monolayer ν / thickness</th><td>{{ m.monolayer.poisson_ratio }} / {{ m.monolayer.thickness_m }} m</td></tr>
+<tr><th>Geometry</th><td>{{ m.geometry.type }} (source flag {{ m.geometry.source_flag }})</td></tr>
+</table>
+<h2>Image and structured grids</h2>
+<table>
+<tr><th>Domain image</th><td>{{ a.image.domain_shape|join(' × ') }} · {{ a.image.domain_dtype }}</td></tr>
+<tr><th>Label image</th><td>{{ a.image.labels_shape|join(' × ') }} · {{ a.image.labels_dtype }}</td></tr>
+<tr><th>DIC grid / range</th><td>{{ a.dic.spatial_shape|join(' × ') }} · x {{ a.dic.x_min }}…{{ a.dic.x_max }}, y {{ a.dic.y_min }}…{{ a.dic.y_max }}</td></tr>
+<tr><th>Traction grid / range</th><td>{{ a.traction.spatial_shape|join(' × ') }} · x {{ a.traction.x_min }}…{{ a.traction.x_max }}, y {{ a.traction.y_min }}…{{ a.traction.y_max }}</td></tr>
+<tr><th>DIC spacing</th><td>dx={{ a.dic.median_dx }}, dy={{ a.dic.median_dy }}</td></tr>
+<tr><th>Traction spacing</th><td>dx={{ a.traction.median_dx }}, dy={{ a.traction.median_dy }}</td></tr>
+<tr><th>w0 / d0 / inc</th><td>{{ a.dic.w0 }} / {{ a.dic.d0 }} / {{ a.dic.inc }}</td></tr>
+</table>
+<h2>Detected DIC → traction mapping</h2>
+<table>
+<tr><th>Exact coordinate subset</th><td>{{ g.traction_is_dic_subset }}</td></tr>
+<tr><th>DIC row slice</th><td><code>{{ g.dic_row_start }}:{{ g.dic_row_stop }}</code></td></tr>
+<tr><th>DIC column slice</th><td><code>{{ g.dic_col_start }}:{{ g.dic_col_stop }}</code></td></tr>
+<tr><th>Removed samples (top/bottom/left/right)</th><td>{{ g.removed_rows_before }} / {{ g.removed_rows_after }} / {{ g.removed_cols_before }} / {{ g.removed_cols_after }}</td></tr>
+<tr><th>Maximum coordinate mismatch</th><td>{{ g.max_coordinate_error }}</td></tr>
+<tr><th>Historical interpretation</th><td>{{ a.historical_processing_interpretation.status }} — {{ a.historical_processing_interpretation.statement }}</td></tr>
+</table>
+<h2>Published displacement agreement</h2>
+<table>
+<tr><th>Comparison</th><td>{{ d.comparison_method }}</td></tr>
+<tr><th>Exact u/v equality</th><td>{{ d.fields_are_exactly_equal }}</td></tr>
+<tr><th>Global u / v RMSE</th><td>{{ d.u_rmse_global }} / {{ d.v_rmse_global }}</td></tr>
+<tr><th>Mean per-frame u / v RMSE</th><td>{{ d.u_rmse_by_frame_summary.mean }} / {{ d.v_rmse_by_frame_summary.mean }}</td></tr>
+<tr><th>Mean per-frame u / v correlation</th><td>{{ d.u_correlation_by_frame_summary.mean }} / {{ d.v_correlation_by_frame_summary.mean }}</td></tr>
+<tr><th>Per-frame artifact</th><td><code>data/{{ report.position }}/diagnostics/grid_alignment.npz</code></td></tr>
+</table>
+<h2>Coordinate transform</h2>
+<table>
+<tr><th>Image origin / y direction</th><td>{{ c.image_coordinates.array_index_origin }} / {{ c.image_coordinates.y_direction }}</td></tr>
+<tr><th>Source mechanical origin</th><td>{{ c.source_mechanical_coordinates.origin_convention }}</td></tr>
+<tr><th>Source → image index</th><td>x offset {{ c.source_mechanical_coordinates.to_image_array_index.offset_x }}, y offset {{ c.source_mechanical_coordinates.to_image_array_index.offset_y }}, status {{ c.source_mechanical_coordinates.to_image_array_index.status }}</td></tr>
+<tr><th>FEM target</th><td>{{ c.image_array_index_to_fem_target.target_origin }}; y flip required={{ c.image_array_index_to_fem_target.flip_y }}; applied={{ c.image_array_index_to_fem_target.applied_in_stage_2 }}</td></tr>
+<tr><th>Centroid/label evidence</th><td>{{ c.source_mechanical_coordinates.evidence.conclusion }}; max error {{ c.source_mechanical_coordinates.evidence.max_centroid_coordinate_error_pixels }} px</td></tr>
+</table>
+{% if report.geometry %}
+{% set g3=report.geometry %}{% set gc=g3.cells %}{% set ga=g3.adjacency %}
+<h2>Stage 3 vector geometry — reference frame {{ g3.geometry_frame }}</h2>
+<p class="warning"><strong>Semantic constraint:</strong> {{ g3.label_semantics }}</p>
+<table>
+<tr><th>Raster labels / extracted polygons</th><td>{{ gc.raster_label_count }} / {{ gc.extracted_polygon_count }}</td></tr>
+<tr><th>Domain area</th><td>{{ g3.domain.area_um2 }} µm² ({{ g3.domain.vector_area_pixels }} pixels)</td></tr>
+<tr><th>Mean / median label area</th><td>{{ gc.mean_area_um2 }} / {{ gc.median_area_um2 }} µm²</td></tr>
+<tr><th>Invalid / empty polygons</th><td>{{ gc.invalid_polygon_count }} / {{ gc.empty_polygon_count }}</td></tr>
+<tr><th>Multipolygons</th><td>{{ gc.multipolygon_count }}</td></tr>
+<tr><th>Domain status</th><td>{{ gc.boundary_status_counts }}</td></tr>
+<tr><th>Adjacency edges</th><td>{{ ga.edge_count }}</td></tr>
+<tr><th>Mean / median neighbor count</th><td>{{ ga.mean_neighbor_count }} / {{ ga.median_neighbor_count }}</td></tr>
+<tr><th>Global raster/vector area error</th><td>{{ gc.global_relative_area_error }}</td></tr>
+<tr><th>Maximum per-label area error</th><td>{{ gc.maximum_per_cell_relative_area_error }}</td></tr>
+<tr><th>Centroid mismatch, median / maximum</th><td>{{ g3.centroid_agreement.median_mismatch_pixels }} / {{ g3.centroid_agreement.maximum_mismatch_pixels }} pixels</td></tr>
+<tr><th>Stage 4 boundary readiness</th><td>Domain: {{ g3.stage4_readiness.domain_geometry_safe_for_constrained_meshing }}; label polygons as epithelial boundaries: {{ g3.stage4_readiness.label_polygons_safe_as_epithelial_cell_boundaries }}</td></tr>
+</table>
+{% endif %}
+{% if report.mesh %}
+{% set fm=report.mesh %}{% set mq=fm.quality %}{% set gp=fm.geometry_preservation %}{% set tr=fm.traction_resolution %}
+<h2>Stage 4 constrained continuum mesh</h2>
+<p>{{ fm.nuclear_label_constraint.statement }} Nuclear labels used as mesh constraints: <strong>{{ fm.nuclear_label_constraint.used_as_mesh_constraints }}</strong>.</p>
+<table>
+<tr><th>Nodes / elements</th><td>{{ fm.mesh.node_count }} / {{ fm.mesh.element_count }}</td></tr>
+<tr><th>Boundary nodes / edges</th><td>{{ fm.mesh.boundary_node_count }} / {{ fm.mesh.boundary_edge_count }}</td></tr>
+<tr><th>Connected components</th><td>{{ fm.mesh.connected_component_count }} (expected {{ fm.mesh.expected_meshed_component_count }})</td></tr>
+<tr><th>Domain / mesh area</th><td>{{ gp.intended_meshed_domain_area_um2 }} / {{ gp.mesh_area_um2 }} µm²</td></tr>
+<tr><th>Relative area error</th><td>{{ gp.relative_area_error }}</td></tr>
+<tr><th>Boundary Hausdorff / maximum deviation</th><td>{{ gp.hausdorff_distance_um }} / {{ gp.maximum_boundary_deviation_um }} µm</td></tr>
+<tr><th>Minimum / median minimum angle</th><td>{{ mq.minimum_angle_degrees.min }}° / {{ mq.minimum_angle_degrees.median }}°</td></tr>
+<tr><th>Maximum / median aspect ratio</th><td>{{ mq.aspect_ratio.max }} / {{ mq.aspect_ratio.median }}</td></tr>
+<tr><th>Target / actual median edge</th><td>{{ tr.target_edge_length_um }} / {{ tr.actual_median_edge_length_um }} µm</td></tr>
+<tr><th>Traction spacing / edge ratio</th><td>{{ tr.representative_um }} µm / {{ tr.actual_median_edge_to_traction_spacing_ratio }}</td></tr>
+<tr><th>Excluded components / area</th><td>{{ fm.component_policy.excluded_component_count }} / {{ fm.component_policy.excluded_area_um2 }} µm²</td></tr>
+<tr><th>Invalid elements</th><td>{{ fm.containment.invalid_element_count }}</td></tr>
+<tr><th>Stage 5 continuous-domain readiness</th><td>{{ fm.stage5_readiness.safe_for_traction_mapping }}</td></tr>
+</table>
+{% endif %}
+{% if report.loads %}
+{% set ld=report.loads %}{% set mc=ld.mapping_conservation %}{% set eq=ld.experimental_equilibrium %}
+<h2>Stage 5 published traction → conservative FEM loads</h2>
+<p class="warning"><strong>Sign semantics unresolved:</strong> {{ ld.units_and_semantics.published_traction_semantics }}. Stored semantic sign={{ ld.units_and_semantics.stored_semantic_sign }}; traction-to-FEM action/reaction sign={{ ld.units_and_semantics.traction_to_fem_sign }}.</p>
+<table>
+<tr><th>Frames / completeness</th><td>{{ ld.processed_frame_count }} / {{ ld.expected_frame_count }} · complete={{ ld.complete_canonical_time_series }}</td></tr>
+<tr><th>Interpolation / quadrature</th><td>{{ ld.mapping.interpolation_method }} · {{ ld.mapping.quadrature_rule }} (order {{ ld.mapping.quadrature_order }}, {{ ld.mapping.quadrature_points_per_element }} points/element)</td></tr>
+<tr><th>Quadrature outside support</th><td>{{ ld.mapping.quadrature_points_outside_traction_support }} / {{ ld.mapping.quadrature_points_total_per_frame }}</td></tr>
+<tr><th>Force mapping error, median / max</th><td>{{ mc.force_error_over_integrated_traction.median }} / {{ mc.force_error_over_integrated_traction.maximum }}</td></tr>
+<tr><th>Moment mapping error, median / max</th><td>{{ mc.moment_error_over_integrated_abs_moment.median }} / {{ mc.moment_error_over_integrated_abs_moment.maximum }}</td></tr>
+<tr><th>Experimental net-force fraction, median / max</th><td>{{ eq.net_force_fraction.median }} / {{ eq.net_force_fraction.maximum }}</td></tr>
+<tr><th>Experimental net-moment fraction, median / max</th><td>{{ eq.net_moment_fraction.median }} / {{ eq.net_moment_fraction.maximum }}</td></tr>
+<tr><th>Worst force / moment balance frames</th><td>{{ eq.worst_force_balance_frame }} / {{ eq.worst_moment_balance_frame }}</td></tr>
+<tr><th>Equilibrium correction</th><td>{{ eq.correction_applied }}</td></tr>
+<tr><th>Stage 6 numerical conservation</th><td>{{ ld.stage6_input.numerically_conservative }}</td></tr>
+</table>
+{% endif %}
+<h2>Warnings</h2>
+{% set combined_warnings = a.warnings + (report.geometry.warnings if report.geometry else []) + (report.loads.warnings if report.loads else []) %}
+{% if combined_warnings %}<ul>{% for warning in combined_warnings %}<li class="warning">{{ warning }}</li>{% endfor %}</ul>{% else %}<p class="ok">No missing-data or geometry warnings.</p>{% endif %}
+<details><summary>Complete alignment JSON</summary><pre>{{ a | tojson(indent=2) }}</pre></details>
+</body>
+</html>

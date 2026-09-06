@@ -1,0 +1,37 @@
+[project]
+name = "dryad"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Ajay", email = "ajay@planmonster.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "jinja2>=3.1.6",
+    "meshio>=5.3.5",
+    "meshpy>=2026.1.1",
+    "numpy>=2.5.2",
+    "pandas>=3.0.5",
+    "pillow>=12.3.0",
+    "plotly>=7.0.0",
+    "pyvista>=0.48.4",
+    "pyyaml>=6.0.3",
+    "scikit-fem>=12.0.2",
+    "scikit-image>=0.26.0",
+    "scipy>=1.18.1",
+    "shapely>=2.1.2",
+    "tifffile>=2026.8.23",
+    "trame>=3.13.2",
+    "trame-vtk>=2.11.16",
+    "trame-vuetify>=3.2.5",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[project.scripts]
+dryad = "dryad:main"
+
+[build-system]
+requires = ["uv_build>=0.12.2,<0.13.0"]
+build-backend = "uv_build"

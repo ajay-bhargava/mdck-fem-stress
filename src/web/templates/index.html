@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How a living cell sheet pushes</title>
+  <style>
+    #film { position:absolute; inset:0; pointer-events:none; }
+    #film img { position:absolute; width:100%; height:100%; object-fit:contain; }
+    #film[hidden] { display:none; }
+    .story-card[data-view="nuclear_segmentation"] { left:96vw; top:12vh; transform:translateX(-100%); }
+    .story-card[data-view="predicted_stress"] { left:96vw; top:12vh; transform:translateX(-100%); }
+    .stress-scale { margin-top:12px; font:11px Arial,sans-serif; color:#c6c8cd; }
+    .stress-scale .bar { height:6px; margin:6px 0; background:linear-gradient(to right,rgb(22,19,45),rgb(80,35,105),rgb(175,54,94),rgb(240,122,60),rgb(252,237,164)); }
+    :root { color-scheme:dark; --ink:#eeeae4; --muted:#999ba3; --line:#383b42; --accent:#ee9a73; }
+    * { box-sizing:border-box; }
+    html { scrollbar-width:none; }
+    html::-webkit-scrollbar { display:none; }
+    body { margin:0; font-family:Arial,Helvetica,sans-serif; color:var(--ink); background:#08090b; height:1600vh; }
+    main { position:fixed; inset:0; min-height:0; background:#08090b; }
+    .visual { position:relative; width:100%; height:100%; }
+    .story-card { position:absolute; z-index:5; left:4vw; top:9vh; width:min(360px,calc(100% - 32px)); padding:18px 20px; background:rgba(17,19,23,.87); border-top:2px solid var(--accent); backdrop-filter:blur(12px); pointer-events:none; transition:left .6s ease,top .6s ease,transform .6s ease; }
+    .story-card .kicker { color:var(--accent); font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+    .story-card h1 { margin:5px 0 7px; font:700 clamp(21px,2.2vw,31px)/1.08 Georgia,serif; }
+    .story-card p { margin:0; font:15px/1.42 Georgia,serif; color:#c6c8cd; }
+    .story-card .metric { margin-top:10px; font:400 12px/1.4 Arial,sans-serif; color:#a4a8b2; }
+    .story-card[data-view="fem_story"] { left:96vw; top:12vh; transform:translateX(-100%); }
+    .story-card[data-view="fem_nodal_forces"] { left:4vw; top:78vh; transform:translateY(-100%); }
+    .story-card[data-view="force_balance_story"] { left:96vw; top:78vh; transform:translate(-100%,-100%); }
+    .controls { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); width:auto; margin:0; padding:0; }
+    .select-row { display:flex; gap:12px; margin:0; }
+    .controls label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+    select { width:auto; max-width:52vw; min-height:34px; background:rgba(17,19,23,.92); color:var(--ink); border:1px solid #383b42; border-radius:20px; padding:8px 14px; }
+    .scroll-hint { white-space:nowrap; margin-top:10px; color:#969ba5; font-size:11px; text-align:center; }
+    #status { position:fixed; bottom:90px; width:100%; color:#efab95; font-size:12px; text-align:center; }
+    @media(max-width:650px) {
+      .story-card { width:min(290px,88vw); padding:12px 15px; }
+      .story-card h1 { font-size:23px; }
+      .story-card p { font-size:14px; }
+      .story-card[data-view="fem_nodal_forces"],.story-card[data-view="force_balance_story"] { top:72vh; }
+    }
+    @media(prefers-reduced-motion:reduce) { .story-card { transition:none; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="visual">
+    <div id="film" hidden aria-label="Educational time-lapse"><img id="filmImage" alt="Observed nuclei"><img id="filmLabels" alt="" hidden></div>
+    <aside class="story-card" aria-live="polite"><div class="kicker" id="storyKicker">Observed</div><h1 id="storyTitle">A living sheet of cells</h1><p id="storyBody">Nuclei act as landmarks as the monolayer changes over time.</p><div class="metric" id="storyMetric"></div><div id="stressScale" class="stress-scale" hidden>Maximum absolute principal stress<div class="bar"></div><span id="stressScaleText"></span></div></aside>
+  </div>
+  <section class="controls" aria-label="Time-lapse controls">
+    <div class="select-row">
+      <div><label for="position">Position</label><select id="position"></select></div>
+      <div><label for="layer">View</label><select id="layer"></select></div>
+      <div id="thicknessControl" hidden><label for="thickness">Tissue thickness</label><select id="thickness" aria-label="Tissue thickness"></select></div>
+    </div>
+    <div class="scroll-hint">Scroll to move through time · <span id="elapsed">0.00 h</span></div>
+    <div id="status" aria-live="polite"></div>
+  </section>
+</main>
+<script>
+const layerLabels = {
+  nuclei:'1 · Nuclei',
+  nuclear_segmentation:'2 · Nuclear segmentation',
+  fem_story:'3 · Finite element map',
+  fem_nodal_forces:'4 · Nodal forces',
+  force_balance_story:'5 · Force balance',
+  predicted_stress:'6 · Predicted tissue stress'
+};
+const stories = {
+  nuclei:['Observed','A living sheet of cells','Scroll to watch the nuclei move. Keep scrolling to reveal the next layer.',''],
+  nuclear_segmentation:['Detected','Finding the nuclei','Mint outlines follow the nuclear segmentation in each frame.','Nuclei—not cell boundaries or mesh elements'],
+  fem_story:['Represented','A mesh beneath the image','Triangles divide the tissue into small calculation regions—not individual cells.','Fixed reference mesh · not a stress map'],
+  fem_nodal_forces:['Integrated','The forces beneath the motion','Red arrows show measured loads gathered at mesh nodes.','Arrows enlarged for visibility · action/reaction sign unresolved'],
+  force_balance_story:['Compared','Do the forces cancel?','Nearby loads are added together. Blue means more cancellation; red means less—not local mechanical equilibrium.','']
+};
+const positionEl=document.getElementById('position');
+const layerEl=document.getElementById('layer');
+const thicknessEl=document.getElementById('thickness');
+const statusEl=document.getElementById('status');
+const filmEl=document.getElementById('film');
+const filmImage=document.getElementById('filmImage');
+const filmLabels=document.getElementById('filmLabels');
+const frameEl={value:0,max:96};
+const decodedImages=new Map();
+const state={filmRoot:'',manifest:null,token:0};
+
+function pad(frame){return String(frame).padStart(3,'0');}
+function join(root,path){return root.replace(/\/$/,'')+'/'+path.replace(/^\.\//,'');}
+function readyImage(url){
+  if(decodedImages.has(url))return decodedImages.get(url);
+  const img=new Image();img.src=url;
+  const result=img.decode().then(()=>img);
+  decodedImages.set(url,result);
+  result.catch(()=>decodedImages.delete(url));
+  if(decodedImages.size>16)decodedImages.delete(decodedImages.keys().next().value);
+  return result;
+}
+function setStory(kicker,title,body,metric){
+  document.querySelector('.story-card').dataset.view=layerEl.value;
+  document.getElementById('stressScale').hidden=layerEl.value!=='predicted_stress';
+  document.getElementById('storyKicker').textContent=kicker;
+  document.getElementById('storyTitle').textContent=title;
+  document.getElementById('storyBody').textContent=body;
+  document.getElementById('storyMetric').textContent=metric||'';
+}
+function nucleiUrl(frame){return join(state.filmRoot,`nuclei/frame${pad(frame)}.jpg`);}
+function overlayUrl(chapter,frame){
+  const h=Number(thicknessEl.value);
+  if(chapter==='nuclear_segmentation')return join(state.filmRoot,`nuclear_segmentation/frame${pad(frame)}.png`);
+  if(chapter==='fem_story')return join(state.filmRoot,'mesh.png');
+  if(chapter==='fem_nodal_forces')return join(state.filmRoot,`nodal_forces/frame${pad(frame)}.png`);
+  if(chapter==='force_balance_story')return join(state.filmRoot,`force_balance/frame${pad(frame)}.png`);
+  if(chapter==='predicted_stress')return join(state.filmRoot,`stress/${h}um/frame${pad(frame)}.png`);
+  return '';
+}
+function updateFrameLabel(){
+  const hours=Number(state.manifest?.hours_per_frame||0.25)*Number(frameEl.value);
+  document.getElementById('elapsed').textContent=`${hours.toFixed(2)} h`;
+}
+function applyManifest(manifest,filmRoot,positions){
+  state.manifest=manifest;
+  state.filmRoot=filmRoot;
+  frameEl.max=manifest.frame_count-1;
+  positionEl.innerHTML=positions.map(p=>`<option value="${p}">${p}</option>`).join('');
+  positionEl.parentElement.hidden=positions.length<=1;
+  layerEl.innerHTML=manifest.chapters.map(key=>`<option value="${key}">${layerLabels[key]||key}</option>`).join('');
+  const thicknesses=manifest.thickness_options_um||[2.5,5,10];
+  const labels={2.5:'2.5 µm · thinner',5:'5 µm · reference',10:'10 µm · thicker'};
+  thicknessEl.innerHTML=thicknesses.map(h=>{
+    const value=Number(h);
+    const selected=value===5?' selected':'';
+    return `<option value="${value}"${selected}>${labels[value]||(value+' µm')}</option>`;
+  }).join('');
+  const colorMax=Number(manifest.thickness_comparison_color_max_pa);
+  if(!Number.isFinite(colorMax)||colorMax<=0)throw new Error('Stress color-scale metadata is unavailable.');
+  document.getElementById('stressScaleText').textContent=`0 — ${colorMax.toFixed(0)} Pa · same scale for all times and thicknesses; larger values saturated`;
+  document.body.style.height=`${(1+manifest.chapters.length*2.5)*100}vh`;
+}
+async function loadConfig(){
+  const local=await fetch('manifest.json',{cache:'no-store'});
+  if(local.ok){
+    const manifest=await local.json();
+    applyManifest(manifest,'.',[manifest.position]);
+    return;
+  }
+  const listing=await fetch('/api/positions');
+  if(!listing.ok)throw new Error('Could not load positions');
+  const positions=(await listing.json()).positions;
+  if(!positions.length)throw new Error('No standardized positions found.');
+  const p=positions[0];
+  const remote=await fetch(`/film/${p}/manifest.json`);
+  if(!remote.ok)throw new Error('Film bake is missing. Run: uv run python -m scripts.build_film_display');
+  applyManifest(await remote.json(),`/film/${p}`,positions);
+}
+async function renderCurrent(){
+  const token=++state.token;
+  const chapter=layerEl.value;
+  const frame=Number(frameEl.value);
+  const thickness=Number(thicknessEl.value);
+  document.getElementById('thicknessControl').hidden=chapter!=='predicted_stress';
+  const base=nucleiUrl(frame);
+  const overlay=overlayUrl(chapter,frame);
+  await Promise.all([readyImage(base),...(overlay?[readyImage(overlay)]:[])]);
+  if(token!==state.token)return;
+  if(chapter!==layerEl.value||frame!==Number(frameEl.value)||thickness!==Number(thicknessEl.value))return;
+  filmImage.src=base;
+  filmLabels.hidden=!overlay;
+  if(overlay){
+    filmLabels.src=overlay;
+    filmLabels.alt=chapter==='nuclear_segmentation'?'Nuclear segmentation boundaries':chapter==='predicted_stress'?`Conditional FEM stress magnitude, frame ${frame}`:'';
+  }
+  filmEl.hidden=false;
+  if(chapter==='predicted_stress'){
+    const h=Number(thicknessEl.value);
+    const factor=5/h;
+    setStory('FEM prediction · 97 frames','How the sheet carries stress','The same measured loads produce higher stress in a thinner sheet.',`Assumed thickness ${h} µm · stress ×${factor} versus 5 µm. Exact linear-model scaling; membrane force unchanged. Conditional reconstruction, not a biological response prediction.`);
+  } else if(chapter==='force_balance_story'){
+    const row=state.manifest.frames?.[frame]||{};
+    const residual=Number(row.source_net_force_fraction);
+    const metric=Number.isFinite(residual)?`Whole-image force residual: ${(100*residual).toFixed(1)}%`:'Whole-image force residual unavailable';
+    const copy=stories[chapter];
+    setStory(copy[0],copy[1],copy[2],metric);
+  } else {
+    const copy=stories[chapter];
+    setStory(copy[0],copy[1],copy[2],copy[3]);
+  }
+  for(let step=1;step<=3;step++){
+    const next=frame+step;
+    if(next<=frameEl.max){
+      readyImage(nucleiUrl(next)).catch(()=>{});
+      const nextOverlay=overlayUrl(chapter,next);
+      if(nextOverlay)readyImage(nextOverlay).catch(()=>{});
+    }
+  }
+}
+let renderBusy=false,renderPending=false;
+async function render(){
+  renderPending=true;
+  if(renderBusy)return;
+  renderBusy=true;
+  try{while(renderPending){renderPending=false;await renderCurrent();}}
+  finally{renderBusy=false;}
+}
+function scrubTime(){
+  const count=layerEl.options.length;if(!count||!state.manifest)return;
+  const progress=Math.max(0,Math.min(count,scrollY/Math.max(1,innerHeight*2.5)));
+  const chapter=Math.min(count-1,Math.floor(progress));
+  const next=Math.min(Number(frameEl.max),Math.round((progress-chapter)*Number(frameEl.max)));
+  if(next===Number(frameEl.value)&&chapter===layerEl.selectedIndex)return;
+  layerEl.selectedIndex=chapter;frameEl.value=next;
+  updateFrameLabel();render();
+}
+let scrollTick=0;
+window.addEventListener('scroll',()=>{if(scrollTick)return;scrollTick=requestAnimationFrame(()=>{scrollTick=0;scrubTime();});},{passive:true});
+window.addEventListener('resize',scrubTime);
+layerEl.addEventListener('change',()=>{
+  window.scrollTo(0,layerEl.selectedIndex*innerHeight*2.5);
+  frameEl.value=0;updateFrameLabel();render();
+});
+thicknessEl.addEventListener('change',render);
+positionEl.addEventListener('change',()=>statusEl.textContent='Only pos01 is available in this film.');
+loadConfig().then(()=>{
+  frameEl.value=0;window.scrollTo(0,0);updateFrameLabel();
+  return render();
+}).catch(error=>{statusEl.textContent=error.message;});
+</script>
+</body>
+</html>
